@@ -24,6 +24,7 @@ where
     fn set_last_selected(&mut self, item: T);
 }
 
+
 #[macro_export]
 macro_rules! impl_repository_for_manager {
     ($manager:ty, $type:ty, $error:ty) => {
