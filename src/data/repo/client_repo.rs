@@ -238,7 +238,11 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientRepo {
         }
     }
 
-    fn search_by(&self, criteria: &SearchCriteria, page_number: u128) -> Result<String, Error<'a>> {
+    fn search_by(
+        &mut self,
+        criteria: &SearchCriteria,
+        page_number: u128,
+    ) -> Result<LastSearch<SearchCriteria>, Error<'a>> {
         let mut query = "SELECT id_client, client_active, client_name FROM Client".to_string();
 
         if let Some(id_client) = criteria.id_client {
@@ -280,8 +284,7 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientRepo {
             criteria.clone(),
             serde_json::to_string(&result)?,
         );
-        Ok(search);
 
-        todo!()
+        Ok(search)
     }
 }

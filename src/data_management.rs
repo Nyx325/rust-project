@@ -33,11 +33,15 @@ where
     fn from_row(row: &Row) -> Result<Model, Err>;
     fn page_size(&self) -> u128;
     fn search_by_id(&self, id: u32) -> Result<Option<Model>, Err>;
-    fn search_by(&self, criteria: &SearchCriteria, page_number: u128) -> Result<String, Err>;
+    fn search_by(
+        &mut self,
+        criteria: &SearchCriteria,
+        page_number: u128,
+    ) -> Result<LastSearch<SearchCriteria>, Err>;
 }
 
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LastSearch<SearchCriteria> {
     pub page: u128,
     pub criteria: SearchCriteria,

@@ -1,6 +1,6 @@
 use crate::data::model::client::Client;
 use crate::data::repo::client_repo::{ClientRepo, Error as RepoError, SearchCriteria};
-use crate::data_management::{LastSearch, Manager, Repository};
+use crate::data_management::{Finder, LastSearch, Manager, Repository};
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -45,7 +45,14 @@ impl<'a> ClientManager<SearchCriteria> {
     }
 
     fn update_last_search(&mut self) -> Result<(), Error<'a>> {
-        todo!()
+        if self.last_search.is_none() {
+            return Ok(());
+        }
+
+        let last_search = self.last_search.clone().unwrap();
+        let result = self.search_by(&last_search.criteria, last_search.page)?;
+        self.last_search = Some(result);
+        Ok(())
     }
 }
 
@@ -83,7 +90,7 @@ impl<'a> Manager<Client, SearchCriteria, Error<'a>> for ClientManager<SearchCrit
     }
 
     fn last_search(&self) -> Option<LastSearch<SearchCriteria>> {
-        todo!()
+        self.last_search.clone()
     }
 
     fn last_selected(&self) -> Option<Client> {
@@ -123,5 +130,30 @@ impl<'a> Repository<Client, Error<'a>> for ClientManager<SearchCriteria> {
         self.repository.modify(item)?;
         self.update_last_search()?;
         Ok(())
+    }
+}
+
+#[allow(unused)]
+impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientManager<SearchCriteria> {
+    fn from_row(row: &rusqlite::Row) -> Result<Client, Error<'a>> {
+        Ok(ClientRepo::from_row(row)?)
+    }
+
+    fn page_size(&self) -> u128 {
+        self.repository.page_size()
+    }
+
+    fn search_by(
+        &mut self,
+        criteria: &SearchCriteria,
+        page_number: u128,
+    ) -> Result<LastSearch<SearchCriteria>, Error<'a>> {
+        let result = self.repository.search_by(criteria, page_number)?;
+        self.set_last_search(result.clone());
+        Ok(result)
+    }
+
+    fn search_by_id(&self, id: u32) -> Result<Option<Client>, Error<'a>> {
+        Ok(self.repository.search_by_id(id)?)
     }
 }
