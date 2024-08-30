@@ -1,72 +1,37 @@
+use std::{any::Any, collections::HashMap};
+
 #[allow(unused)]
-pub trait Repository<T, E> 
-where 
-    T: PartialEq + Clone
+pub trait Repository<T, E>
+where
+    T: PartialEq + Clone,
 {
     fn add(&mut self, item: &T) -> Result<(), E>;
     fn drop(&mut self, item: &mut T) -> Result<(), E>;
     fn delete(&mut self, item: &T) -> Result<(), E>;
     fn modify(&mut self, item: &T) -> Result<(), E>;
-    fn search_by_attributes(&mut self, page: usize, json_hashmap: String) 
-        -> Result<String,E>;
+    fn search_by_id(&self, id: u32) -> Result<Option<T>, E>;
+    fn search_by_attributes(
+        &mut self,
+        page: usize,
+        hash_map: HashMap<String, Box<dyn Any>>,
+    ) -> Result<String, E>;
 }
 
 #[allow(unused)]
 pub trait Manager<T, E>
-where 
-    T: PartialEq + Clone
+where
+    T: PartialEq + Clone,
 {
     fn valid_item(&self, item: &T) -> Result<(), E>;
-    fn last_search(&self) -> Option<String>;
+    fn last_search(&self) -> Option<LastSearch>;
     fn set_last_search(&mut self, search: LastSearch);
     fn last_selected(&self) -> Option<T>;
     fn set_last_selected(&mut self, item: T);
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct LastSearch{
+#[derive(Debug)]
+pub struct LastSearch {
     pub page: usize,
-    pub json_hashmap: String,
+    pub hashmap: HashMap<String, Box<dyn Any>>,
     pub result: String,
-}
-
-
-#[macro_export]
-macro_rules! impl_repository_for_manager {
-    ($manager:ty, $type:ty, $error:ty) => {
-        impl Repository<$type, $error> for $manager {
-            fn add(&mut self, item: &$type) -> Result<(), $error> {
-                // Validar antes de delegar al repositorio
-                self.valid_item(item)?;
-                self.repo().add(item)
-            }
-
-            fn drop(&mut self, item: &$type) -> Result<(), $error> {
-                // Validar antes de delegar al repositorio
-                self.valid_item(item)?;
-                self.repo().drop(item)
-            }
-
-            fn delete(&mut self, item: &$type) -> Result<(), $error> {
-                self.repo().delete(item)
-            }
-
-            fn modify(&mut self, item: &$type) -> Result<(), $error> {
-                // Validar antes de delegar al repositorio
-                self.valid_item(item)?;
-                self.repo().modify(item)
-            }
-
-            fn search_by_attributes(
-                &mut self,
-                page: usize,
-                json_hashmap: String,
-            ) -> Result<String, $error> {
-                // Buscar y almacenar el último resultado de búsqueda
-                let result = &mut self.repo().search_by_attributes(page, json_hashmap)?;
-                self.set_last_search(result.clone());
-                Ok(result.to_string())
-            }
-        }
-    };
 }

@@ -4,9 +4,9 @@ use data_management::Repository;
 use logic::client_manager::ClientManager;
 
 mod data;
+mod data_management;
 mod logic;
 mod view;
-mod data_management;
 
 fn main() {
     Connector::db_init().unwrap();
