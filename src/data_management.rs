@@ -16,7 +16,6 @@ pub trait Manager<T, E>
 where 
     T: PartialEq + Clone
 {
-    fn repo(&mut self) -> &mut dyn Repository<T, E>;
     fn valid_item(&self, item: &T) -> Result<(), E>;
     fn last_search(&self) -> Option<String>;
     fn set_last_search(&mut self, search: String);

@@ -54,6 +54,7 @@ impl <'a> From<RusqliteError> for Error<'a> {
 
 
 #[allow(dead_code)]
+#[derive(Debug,Clone,PartialEq)]
 pub struct ClientRepo {
     page_size: u32,
 }
