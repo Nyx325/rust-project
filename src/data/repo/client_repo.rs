@@ -77,8 +77,15 @@ impl <'a> Repository<Client, Error<'a>> for ClientRepo {
         Ok(())
     }
 
-    fn drop(&mut self, item: &Client) -> Result<(), Error<'a>> {
-        todo!()
+    fn drop(&mut self, item: &mut Client) -> Result<(), Error<'a>> {
+        let conn = Connector::get_conection()?;
+        let query = "UPDATE Client SET client_active = 0 WHERE id_client = ?";
+        conn
+            .prepare(query)?
+            .execute(params![item.id_client])?;
+
+        item.client_active = false;
+        Ok(())
     }
 
     fn delete(&mut self, item: &Client) -> Result<(), Error<'a>> {

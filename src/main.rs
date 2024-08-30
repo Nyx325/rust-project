@@ -1,5 +1,7 @@
-use data::{model::client::Client, repo::{client_repo::ClientRepo, conector::Connector}};
+use data::model::client::Client;
+use data::repo::conector::Connector;
 use data_management::Repository;
+use logic::client_manager::ClientManager;
 
 mod data;
 mod logic;
@@ -8,8 +10,10 @@ mod data_management;
 
 fn main() {
     Connector::db_init().unwrap();
-    let mut repo = ClientRepo::new(50);
-    let item = Client::default();
+    let mut manager = ClientManager::new();
+    let mut item = Client::default();
+    item.client_name = "Famsa".to_string();
+    item.client_active = true;
     println!("{}", item);
-    repo.add(&item).unwrap();
+    manager.add(&item).unwrap();
 }

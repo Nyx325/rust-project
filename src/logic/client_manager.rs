@@ -1,5 +1,5 @@
 use crate::data::model::client::Client;
-use crate::data_management::{Manager, Repository};
+use crate::data_management::{LastSearch, Manager, Repository};
 use crate::data::repo::client_repo::{ClientRepo, Error as RepoError};
 
 #[allow(unused)]
@@ -30,7 +30,7 @@ impl <'a>From<RepoError<'a>> for Error<'a> {
 
 pub struct ClientManager {
     repository: ClientRepo,
-    last_search: Option<String>,
+    last_search: Option<LastSearch>,
     last_selected: Option<Client>,
 }
 
@@ -43,6 +43,17 @@ impl <'a>ClientManager {
             last_selected: None,
         }
     }
+
+    fn update_last_search(&mut self) -> Result<(), Error<'a>> {
+        if let Some(last_search) = &self.last_search {
+            self.search_by_attributes(
+                last_search.page, 
+                last_search.json_hashmap.clone()
+            )?;
+        }
+
+        Ok(())
+    }
 }
 
 #[allow(unused)]
@@ -52,6 +63,10 @@ impl <'a> Manager<Client, Error<'a>> for ClientManager {
     
         if item.id_client.is_some() {
             errors.push("se intenta agregar un elemento existente".to_string());
+        }
+
+        if !item.client_active {
+            errors.push("el campo client_active debe ser true".to_string());
         }
     
         if item.client_name.is_empty() {
@@ -77,14 +92,14 @@ impl <'a> Manager<Client, Error<'a>> for ClientManager {
     }
 
     fn last_search(&self) -> Option<String> {
-        self.last_search.clone()
+        self.last_search.as_ref().map(|search| search.result.clone())
     }
 
     fn last_selected(&self) -> Option<Client> {
         self.last_selected.clone()
     }
 
-    fn set_last_search(&mut self, search: String) {
+    fn set_last_search(&mut self, search: LastSearch) {
         self.last_search = Some(search)
     }
 
@@ -97,28 +112,39 @@ impl <'a> Repository<Client, Error<'a>> for ClientManager {
     fn add(&mut self, item: &Client) -> Result<(), Error<'a>> {
         self.valid_item(item)?;
         self.repository.add(item)?;
+        self.update_last_search()?;
         Ok(())
     }
 
-    fn drop(&mut self, item: &Client) -> Result<(), Error<'a>> {
+    fn drop(&mut self, item: &mut Client) -> Result<(), Error<'a>> {
         self.repository.drop(item)?;
+        self.update_last_search()?;
         Ok(())
     }
 
     fn delete(&mut self, item: &Client) -> Result<(), Error<'a>> {
         self.repository.delete(item)?;
+        self.update_last_search()?;
         Ok(())
     }
 
     fn modify(&mut self, item: &Client) -> Result<(), Error<'a>> {
         self.repository.modify(item)?;
+        self.update_last_search()?;
         Ok(())
     }
 
     fn search_by_attributes(&mut self, page: usize, json_hashmap: String) 
             -> Result<String,Error<'a>> {
-        let search = self.repository.search_by_attributes(page, json_hashmap)?;
-        self.set_last_search(search.clone());
+        let search = self.repository.search_by_attributes(page, json_hashmap.clone())?;
+        self.set_last_search(
+            LastSearch { 
+                page, 
+                json_hashmap, 
+                result: search.clone(),  
+            }
+        );
+
         Ok(search)
     }
 }
