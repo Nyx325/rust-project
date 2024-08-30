@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-
 use crate::data::model::client::Client;
-use crate::data::repo::client_repo::{ClientRepo, Error as RepoError};
+use crate::data::repo::client_repo::{ClientRepo, Error as RepoError, SearchCriteria};
 use crate::data_management::{LastSearch, Manager, Repository};
 
 #[allow(unused)]
@@ -30,14 +28,14 @@ impl<'a> From<RepoError<'a>> for Error<'a> {
     }
 }
 
-pub struct ClientManager {
+pub struct ClientManager<SearchCriteria> {
     repository: ClientRepo,
-    last_search: Option<LastSearch>,
+    last_search: Option<LastSearch<SearchCriteria>>,
     last_selected: Option<Client>,
 }
 
 #[allow(unused)]
-impl<'a> ClientManager {
+impl<'a> ClientManager<SearchCriteria> {
     pub fn new() -> Self {
         Self {
             repository: ClientRepo::new(25),
@@ -47,23 +45,12 @@ impl<'a> ClientManager {
     }
 
     fn update_last_search(&mut self) -> Result<(), Error<'a>> {
-        if let Some(last_search) = &self.last_search {
-            let mut hash_map = HashMap::new();
-
-            for key in last_search.hashmap.keys() {
-                let value = last_search.hashmap.get(key).unwrap();
-                hash_map.insert(key.to_string(), value.clone());
-            }
-
-            self.search_by_attributes(last_search.page, hash_map)?;
-        }
-
-        Ok(())
+        todo!()
     }
 }
 
 #[allow(unused)]
-impl<'a> Manager<Client, Error<'a>> for ClientManager {
+impl<'a> Manager<Client, SearchCriteria, Error<'a>> for ClientManager<SearchCriteria> {
     fn valid_item(&self, item: &Client) -> Result<(), Error<'a>> {
         let mut errors = Vec::new();
 
@@ -95,17 +82,15 @@ impl<'a> Manager<Client, Error<'a>> for ClientManager {
         Ok(())
     }
 
-    fn last_search(&self) -> Option<String> {
-        self.last_search
-            .as_ref()
-            .map(|search| search.result.clone())
+    fn last_search(&self) -> Option<LastSearch<SearchCriteria>> {
+        todo!()
     }
 
     fn last_selected(&self) -> Option<Client> {
         self.last_selected.clone()
     }
 
-    fn set_last_search(&mut self, search: LastSearch) {
+    fn set_last_search(&mut self, search: LastSearch<SearchCriteria>) {
         self.last_search = Some(search)
     }
 
@@ -114,7 +99,7 @@ impl<'a> Manager<Client, Error<'a>> for ClientManager {
     }
 }
 
-impl<'a> Repository<Client, Error<'a>> for ClientManager {
+impl<'a> Repository<Client, Error<'a>> for ClientManager<SearchCriteria> {
     fn add(&mut self, item: &Client) -> Result<(), Error<'a>> {
         self.valid_item(item)?;
         self.repository.add(item)?;
@@ -138,26 +123,5 @@ impl<'a> Repository<Client, Error<'a>> for ClientManager {
         self.repository.modify(item)?;
         self.update_last_search()?;
         Ok(())
-    }
-
-    fn search_by_attributes(
-        &mut self,
-        page: usize,
-        json_hashmap: String,
-    ) -> Result<String, Error<'a>> {
-        let search = self
-            .repository
-            .search_by_attributes(page, json_hashmap.clone())?;
-        self.set_last_search(LastSearch {
-            page,
-            json_hashmap,
-            result: search.clone(),
-        });
-
-        Ok(search)
-    }
-
-    fn search_by_id(&self, id: u32) -> Result<Option<Client>, Error<'a>> {
-        Ok(self.repository.search_by_id(id)?)
     }
 }

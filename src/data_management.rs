@@ -1,37 +1,56 @@
-use std::{any::Any, collections::HashMap};
+use rusqlite::Row;
+
+use crate::data::repo::client_repo::SearchCriteria;
 
 #[allow(unused)]
-pub trait Repository<T, E>
+pub trait Repository<Model, Err>
 where
-    T: PartialEq + Clone,
+    Model: PartialEq + Clone + serde::Serialize,
 {
-    fn add(&mut self, item: &T) -> Result<(), E>;
-    fn drop(&mut self, item: &mut T) -> Result<(), E>;
-    fn delete(&mut self, item: &T) -> Result<(), E>;
-    fn modify(&mut self, item: &T) -> Result<(), E>;
-    fn search_by_id(&self, id: u32) -> Result<Option<T>, E>;
-    fn search_by_attributes(
-        &mut self,
-        page: usize,
-        hash_map: HashMap<String, Box<dyn Any>>,
-    ) -> Result<String, E>;
+    fn add(&mut self, item: &Model) -> Result<(), Err>;
+    fn drop(&mut self, item: &mut Model) -> Result<(), Err>;
+    fn delete(&mut self, item: &Model) -> Result<(), Err>;
+    fn modify(&mut self, item: &Model) -> Result<(), Err>;
 }
 
 #[allow(unused)]
-pub trait Manager<T, E>
+pub trait Manager<Model, SearchCriteria, Err>
 where
-    T: PartialEq + Clone,
+    Model: PartialEq + Clone,
 {
-    fn valid_item(&self, item: &T) -> Result<(), E>;
-    fn last_search(&self) -> Option<LastSearch>;
-    fn set_last_search(&mut self, search: LastSearch);
-    fn last_selected(&self) -> Option<T>;
-    fn set_last_selected(&mut self, item: T);
+    fn valid_item(&self, item: &Model) -> Result<(), Err>;
+    fn last_search(&self) -> Option<LastSearch<SearchCriteria>>;
+    fn set_last_search(&mut self, search: LastSearch<SearchCriteria>);
+    fn last_selected(&self) -> Option<Model>;
+    fn set_last_selected(&mut self, item: Model);
 }
 
+#[allow(unused)]
+pub trait Finder<Model, SearchCriteria, Err>
+where
+    Model: PartialEq + Clone,
+{
+    fn from_row(row: &Row) -> Result<Model, Err>;
+    fn page_size(&self) -> u128;
+    fn search_by_id(&self, id: u32) -> Result<Option<Model>, Err>;
+    fn search_by(&self, criteria: &SearchCriteria, page_number: u128) -> Result<String, Err>;
+}
+
+#[allow(unused)]
 #[derive(Debug)]
-pub struct LastSearch {
-    pub page: usize,
-    pub hashmap: HashMap<String, Box<dyn Any>>,
+pub struct LastSearch<SearchCriteria> {
+    pub page: u128,
+    pub criteria: SearchCriteria,
     pub result: String,
+}
+
+#[allow(unused)]
+impl LastSearch<SearchCriteria> {
+    pub fn new(page: u128, criteria: SearchCriteria, result: String) -> LastSearch<SearchCriteria> {
+        Self {
+            page,
+            criteria,
+            result,
+        }
+    }
 }

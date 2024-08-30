@@ -1,4 +1,6 @@
-#[derive(Default, Clone, PartialEq, Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Default, Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Client {
     pub id_client: Option<u32>,
     pub client_active: bool,
