@@ -47,10 +47,6 @@ pub enum Error<'a> {
         file: &'a str,
         line: u32,
     },
-    PageCountError {
-        file: &'a str,
-        line: u32,
-    },
 }
 
 impl<'a> std::fmt::Display for Error<'a> {
@@ -93,13 +89,6 @@ impl<'a> std::fmt::Display for Error<'a> {
             }
             Self::RowShouldReturned { source, file, line } => {
                 write!(f, "RowShouldReturned: {} (on {}: {})", source, file, line)
-            }
-            Self::PageCountError { file, line } => {
-                write!(
-                    f,
-                    "PageCountError: Page size must be non-zero (on {}: {})",
-                    file, line
-                )
             }
         }
     }
