@@ -25,12 +25,6 @@ impl<'a> std::fmt::Display for Error<'a> {
     }
 }
 
-impl<'a> From<RepoError<'a>> for Error<'a> {
-    fn from(value: RepoError<'a>) -> Self {
-        Self::RepoError(value)
-    }
-}
-
 pub struct ClientManager<SearchCriteria> {
     repository: ClientRepo,
     last_search: Option<LastSearch<SearchCriteria>>,
@@ -112,25 +106,31 @@ impl<'a> Manager<Client, SearchCriteria, Error<'a>> for ClientManager<SearchCrit
 impl<'a> Repository<Client, Error<'a>> for ClientManager<SearchCriteria> {
     fn add(&mut self, item: &Client) -> Result<(), Error<'a>> {
         self.valid_item(item)?;
-        self.repository.add(item)?;
+        self.repository.add(item).map_err(|e| Error::RepoError(e))?;
         self.update_last_search()?;
         Ok(())
     }
 
     fn drop(&mut self, item: &mut Client) -> Result<(), Error<'a>> {
-        self.repository.drop(item)?;
+        self.repository
+            .drop(item)
+            .map_err(|e| Error::RepoError(e))?;
         self.update_last_search()?;
         Ok(())
     }
 
     fn delete(&mut self, item: &Client) -> Result<(), Error<'a>> {
-        self.repository.delete(item)?;
+        self.repository
+            .delete(item)
+            .map_err(|e| Error::RepoError(e))?;
         self.update_last_search()?;
         Ok(())
     }
 
     fn modify(&mut self, item: &Client) -> Result<(), Error<'a>> {
-        self.repository.modify(item)?;
+        self.repository
+            .modify(item)
+            .map_err(|e| Error::RepoError(e))?;
         self.update_last_search()?;
         Ok(())
     }
@@ -139,7 +139,8 @@ impl<'a> Repository<Client, Error<'a>> for ClientManager<SearchCriteria> {
 #[allow(unused)]
 impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientManager<SearchCriteria> {
     fn from_row(row: &rusqlite::Row) -> Result<Client, Error<'a>> {
-        Ok(ClientRepo::from_row(row)?)
+        let row = ClientRepo::from_row(row).map_err(|e| Error::RepoError(e))?;
+        Ok(row)
     }
 
     fn page_size(&self) -> u128 {
@@ -151,12 +152,19 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientManager<SearchCrite
         criteria: &SearchCriteria,
         page_number: u128,
     ) -> Result<LastSearch<SearchCriteria>, Error<'a>> {
-        let result = self.repository.search_by(criteria, page_number)?;
+        let result = self
+            .repository
+            .search_by(criteria, page_number)
+            .map_err(|e| Error::RepoError(e))?;
         self.set_last_search(result.clone());
         Ok(result)
     }
 
     fn search_by_id(&self, id: u32) -> Result<Option<Client>, Error<'a>> {
-        Ok(self.repository.search_by_id(id)?)
+        let search = self
+            .repository
+            .search_by_id(id)
+            .map_err(|e| Error::RepoError(e))?;
+        Ok(search)
     }
 }

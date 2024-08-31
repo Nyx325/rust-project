@@ -1,5 +1,3 @@
-use std::collections::LinkedList;
-
 use crate::{
     data::{model::client::Client, repo::client_repo::SearchCriteria},
     data_management::{Finder, Repository},
