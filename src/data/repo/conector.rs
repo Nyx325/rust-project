@@ -72,65 +72,21 @@ impl<'a> std::fmt::Display for Error<'a> {
 
 impl<'a> std::error::Error for Error<'a> {}
 
-impl<'a> From<RusqliteError> for Error<'a> {
-    fn from(source: RusqliteError) -> Self {
-        Self::RusqliteError {
-            source,
-            file: file!(),
-            line: line!(),
-        }
-    }
-}
-
-impl<'a> From<IoError> for Error<'a> {
-    fn from(source: IoError) -> Self {
-        Self::IoError {
-            source,
-            file: file!(),
-            line: line!(),
-        }
-    }
-}
-
-impl<'a> From<DotenvError> for Error<'a> {
-    fn from(source: DotenvError) -> Self {
-        Self::DotenvError {
-            source,
-            file: file!(),
-            line: line!(),
-        }
-    }
-}
-
-impl<'a> From<VarError> for Error<'a> {
-    fn from(source: VarError) -> Self {
-        Self::DotenvVarError {
-            source,
-            line: line!(),
-            file: file!(),
-        }
-    }
-}
-
-fn get_env_var(key: &str) -> Result<String, Error> {
+fn get_env_var<'a>(key: &'a str, file: &'a str, line: u32) -> Result<String, Error<'a>> {
     match dotenv::var(key) {
         Ok(key) => Ok(key),
         Err(e) => match e {
             DotenvError::EnvVar(var_err) => match var_err {
                 VarError::NotPresent => {
                     let key = key.to_string();
-                    let e = Error::MissingEnvVarError {
-                        key,
-                        file: file!(),
-                        line: line!(),
-                    };
+                    let e = Error::MissingEnvVarError { key, file, line };
                     return Err(e);
                 }
                 _ => {
                     let e = Error::DotenvVarError {
                         source: var_err,
-                        line: line!(),
-                        file: file!(),
+                        line,
+                        file,
                     };
                     return Err(e);
                 }
@@ -153,14 +109,18 @@ pub struct Connector;
 impl Connector {
     pub fn get_connection<'a>() -> Result<Connection, Error<'a>> {
         dotenv().ok(); // Load environment variables from the .env file
-        let database_url = get_env_var("DATABASE_URL")?;
-        let conn = Connection::open(database_url)?;
+        let database_url = get_env_var("DATABASE_URL", file!(), line!())?;
+        let conn = Connection::open(database_url).map_err(|e| Error::RusqliteError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
         Ok(conn)
     }
 
     pub fn db_exists<'a>() -> Result<bool, Error<'a>> {
         dotenv().ok(); // Load environment variables from the .env file
-        let database_url = get_env_var("DATABASE_URL")?;
+        let database_url = get_env_var("DATABASE_URL", file!(), line!())?;
         let exists = Path::new(&database_url).exists();
         Ok(exists)
     }
@@ -169,23 +129,31 @@ impl Connector {
         // Check if the database exists
         let db_exists = Self::db_exists()?;
         if !db_exists {
-            let database_url = get_env_var("DATABASE_URL")?;
+            let database_url = get_env_var("DATABASE_URL", file!(), line!())?;
             println!("The database does not exist, proceeding to create it...");
 
             // Create the database
-            let script_path = get_env_var("DATABASE_INIT_SCRIPT")?;
+            let script_path = get_env_var("DATABASE_INIT_SCRIPT", file!(), line!())?;
             let conn = Self::get_connection()?;
             println!("Initialization script located at: {}", script_path);
 
             // Read the SQL script
-            let sql = fs::read_to_string(&script_path)?;
+            let sql = fs::read_to_string(&script_path).map_err(|e| Error::IoError {
+                source: e,
+                file: file!(),
+                line: line!(),
+            })?;
 
             // Temporarily create the database file
             let result = conn.execute_batch(&sql);
             // Delete the database file if an error occurs
             if let Err(e) = result {
                 if Path::new(&database_url).exists() {
-                    fs::remove_file(&database_url)?;
+                    fs::remove_file(&database_url).map_err(|e| Error::IoError {
+                        source: e,
+                        file: file!(),
+                        line: line!(),
+                    })?;
                 }
                 return Err(Error::SqlExecutionError {
                     source: e,
