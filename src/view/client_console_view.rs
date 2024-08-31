@@ -20,6 +20,7 @@ impl ClientConsoleView {
     }
 
     fn add_client(&mut self) {
+        Self::clear_linux_console();
         let mut client = Client::default();
         println!("Add a client");
         client.client_name = Self::capture_string("Type the client name");
@@ -52,6 +53,7 @@ impl ClientConsoleView {
     }
 
     fn list_clients(&mut self) {
+        Self::clear_linux_console();
         let mut page = 1;
         loop {
             let result = match self.search_with_err_map(page, &SearchCriteria::default()) {
@@ -65,6 +67,7 @@ impl ClientConsoleView {
             println!("page {}", page);
             loop {
                 let opc: u8 = Self::capture_atributte("1) prev page\n2) next page\n3) exit", "u8");
+                Self::clear_linux_console();
                 match opc {
                     1 => {
                         if page > 1 {
@@ -76,6 +79,7 @@ impl ClientConsoleView {
                         page += 1;
                         break;
                     }
+                    3 => return,
                     _ => println!("Invalid option"),
                 }
             }
@@ -86,6 +90,7 @@ impl ClientConsoleView {
 impl ConsoleView for ClientConsoleView {
     fn menu(&mut self) {
         loop {
+            Self::clear_linux_console();
             println!("Client Management");
             println!("1) List clients");
             println!("2) Add client");

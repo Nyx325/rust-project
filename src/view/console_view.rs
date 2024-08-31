@@ -1,3 +1,4 @@
+use std::process::Command;
 use std::{io::stdin, str::FromStr};
 
 #[allow(dead_code)]
@@ -31,7 +32,8 @@ pub trait ConsoleView {
                 continue;
             }
 
-            match input.trim().parse::<T>() {
+            let input = input.trim();
+            match input.parse::<T>() {
                 Ok(input) => return input,
                 Err(_) => {
                     println!("No se pudo convertir \"{}\" en \"{}\"", input, type_expect);
@@ -60,6 +62,12 @@ pub trait ConsoleView {
                     continue;
                 }
             };
+        }
+    }
+
+    fn clear_linux_console() {
+        if let Err(e) = Command::new("clear").status() {
+            println!("Error al limpiar consola: {}", e);
         }
     }
 }
