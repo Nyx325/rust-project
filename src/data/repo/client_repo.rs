@@ -21,6 +21,17 @@ pub enum Error<'a> {
         file: &'a str,
         line: u32,
     },
+    SqlExecutionError {
+        source: RusqliteError,
+        query: String,
+        file: &'a str,
+        line: u32,
+    },
+    RowShouldReturned {
+        source: &'a str,
+        file: &'a str,
+        line: u32,
+    },
     ItemShouldExists {
         source: Client,
         file: &'a str,
@@ -36,6 +47,10 @@ pub enum Error<'a> {
         file: &'a str,
         line: u32,
     },
+    PageCountError {
+        file: &'a str,
+        line: u32,
+    },
 }
 
 impl<'a> std::fmt::Display for Error<'a> {
@@ -46,6 +61,18 @@ impl<'a> std::fmt::Display for Error<'a> {
             }
             Self::RusqliteError { source, file, line } => {
                 write!(f, "RusqliteError: {} (on {}: {})", source, file, line)
+            }
+            Self::SqlExecutionError {
+                source,
+                query,
+                file,
+                line,
+            } => {
+                write!(
+                    f,
+                    "RusqliteError: {} Query: {} (on {}: {})",
+                    source, query, file, line
+                )
             }
             Self::ItemShouldExists { source, file, line } => {
                 write!(
@@ -64,6 +91,16 @@ impl<'a> std::fmt::Display for Error<'a> {
             Self::SerdeError { source, file, line } => {
                 write!(f, "SerdeError: {} (on {}: {})", source, file, line)
             }
+            Self::RowShouldReturned { source, file, line } => {
+                write!(f, "RowShouldReturned: {} (on {}: {})", source, file, line)
+            }
+            Self::PageCountError { file, line } => {
+                write!(
+                    f,
+                    "PageCountError: Page size must be non-zero (on {}: {})",
+                    file, line
+                )
+            }
         }
     }
 }
@@ -73,11 +110,11 @@ impl<'a> std::error::Error for Error<'a> {}
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClientRepo {
-    page_size: u128,
+    page_size: u64,
 }
 
 impl ClientRepo {
-    pub fn new(page_size: u128) -> Self {
+    pub fn new(page_size: u64) -> Self {
         Self { page_size }
     }
 }
@@ -93,8 +130,9 @@ impl<'a> Repository<Client, Error<'a>> for ClientRepo {
         let sql = "INSERT INTO Client (client_active, client_name) VALUES (?,?)";
 
         conn.prepare(sql)
-            .map_err(|e| Error::RusqliteError {
+            .map_err(|e| Error::SqlExecutionError {
                 source: e.into(),
+                query: sql.to_string(),
                 file: file!(),
                 line: line!(),
             })?
@@ -117,8 +155,9 @@ impl<'a> Repository<Client, Error<'a>> for ClientRepo {
 
         let query = "UPDATE Client SET client_active = 0 WHERE id_client = ?";
         conn.prepare(query)
-            .map_err(|e| Error::RusqliteError {
+            .map_err(|e| Error::SqlExecutionError {
                 source: e,
+                query: query.to_string(),
                 file: file!(),
                 line: line!(),
             })?
@@ -142,8 +181,9 @@ impl<'a> Repository<Client, Error<'a>> for ClientRepo {
 
         let query = "DELETE FROM Client WHERE id_client = ?";
         conn.prepare(query)
-            .map_err(|e| Error::RusqliteError {
+            .map_err(|e| Error::SqlExecutionError {
                 source: e,
+                query: query.to_string(),
                 file: file!(),
                 line: line!(),
             })?
@@ -245,7 +285,7 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientRepo {
         Ok(client)
     }
 
-    fn page_size(&self) -> u128 {
+    fn page_size(&self) -> u64 {
         self.page_size
     }
 
@@ -258,8 +298,9 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientRepo {
 
         let sql = "SELECT id_client, client_active, client_name FROM Client WHERE id_client = ?";
 
-        let mut stmt = conn.prepare(sql).map_err(|e| Error::RusqliteError {
+        let mut stmt = conn.prepare(sql).map_err(|e| Error::SqlExecutionError {
             source: e,
+            query: sql.to_string(),
             file: file!(),
             line: line!(),
         })?;
@@ -283,44 +324,90 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientRepo {
     fn search_by(
         &mut self,
         criteria: &SearchCriteria,
-        page_number: u128,
+        page_number: u64,
     ) -> Result<LastSearch<SearchCriteria>, Error<'a>> {
-        let mut query = "SELECT id_client, client_active, client_name FROM Client ".to_string();
+        let mut where_str = String::new();
 
         if let Some(id_client) = criteria.id_client {
-            let str = format!("WHERE id_client LIKE %{}% ", id_client);
-            query.push_str(&str);
+            let str = format!(" id_client LIKE %{}% ", id_client);
+            where_str.push_str(&str);
         }
 
         if let Some(client_active) = criteria.client_active {
-            let str = format!("WHERE client_active LIKE %{}% ", client_active);
-            query.push_str(&str);
+            let str = format!(" client_active LIKE %{}% ", client_active);
+            where_str.push_str(&str);
         }
 
         if let Some(client_name) = &criteria.client_name {
-            let str = format!("WHERE client_active LIKE %{}% ", client_name);
-            query.push_str(&str);
+            let str = format!(" client_active LIKE %{}% ", client_name);
+            where_str.push_str(&str);
         }
 
-        let str = format!(
+        if where_str.len() != 0 {
+            where_str = format!("WHERE {}", where_str);
+        }
+
+        let page_system = format!(
             "ORDER BY client_name LIMIT {} OFFSET ( {} - 1 ) * {}",
             self.page_size(),
             page_number,
             self.page_size()
         );
 
-        query.push_str(&str);
+        let count_query = format!("SELECT COUNT(*) FROM Client {}", &where_str);
+        let query = format!(
+            "SELECT id_client, client_active, client_name FROM Client {} {}",
+            &where_str, &page_system
+        );
 
         let conn = Connector::get_connection().map_err(|e| Error::ConnectorError {
             source: e,
             file: file!(),
             line: line!(),
         })?;
-        let mut stmt = conn.prepare(&query).map_err(|e| Error::RusqliteError {
+
+        let mut stmt = conn
+            .prepare(&count_query)
+            .map_err(|e| Error::SqlExecutionError {
+                source: e,
+                query: count_query.to_string(),
+                file: file!(),
+                line: line!(),
+            })?;
+
+        let mut count_row = stmt.query(params![]).map_err(|e| Error::RusqliteError {
             source: e,
             file: file!(),
             line: line!(),
         })?;
+
+        let count_row = count_row.next().map_err(|e| Error::RusqliteError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
+
+        let total_registers: u64 = if let Some(row) = count_row {
+            row.get(0).map_err(|_| Error::FromRowError {
+                source: "id_client",
+                file: file!(),
+                line: line!(),
+            })?
+        } else {
+            return Err(Error::RowShouldReturned {
+                source: "Un SELECT COUNT() deberia devolver al menos una fila",
+                file: file!(),
+                line: line!(),
+            });
+        };
+
+        let mut stmt = conn.prepare(&query).map_err(|e| Error::SqlExecutionError {
+            source: e,
+            query: query.to_string(),
+            file: file!(),
+            line: line!(),
+        })?;
+
         let mut rows = stmt.query(params![]).map_err(|e| Error::RusqliteError {
             source: e,
             file: file!(),
@@ -343,8 +430,19 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientRepo {
             line: line!(),
         })?;
 
-        let search: LastSearch<SearchCriteria> =
-            LastSearch::new(page_number, criteria.clone(), result);
+        println!(
+            "{}/{} = {}",
+            total_registers,
+            self.page_size(),
+            Self::total_pages(total_registers, self.page_size())
+        );
+
+        let search: LastSearch<SearchCriteria> = LastSearch::new(
+            page_number,
+            Self::total_pages(total_registers, self.page_size()),
+            criteria.clone(),
+            result,
+        );
 
         Ok(search)
     }

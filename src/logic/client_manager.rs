@@ -33,7 +33,7 @@ pub struct ClientManager<SearchCriteria> {
 
 #[allow(unused)]
 impl<'a> ClientManager<SearchCriteria> {
-    pub fn new(page_size: u128) -> Self {
+    pub fn new(page_size: u64) -> Self {
         Self {
             repository: ClientRepo::new(page_size),
             last_search: None,
@@ -143,14 +143,14 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientManager<SearchCrite
         Ok(row)
     }
 
-    fn page_size(&self) -> u128 {
+    fn page_size(&self) -> u64 {
         self.repository.page_size()
     }
 
     fn search_by(
         &mut self,
         criteria: &SearchCriteria,
-        page_number: u128,
+        page_number: u64,
     ) -> Result<LastSearch<SearchCriteria>, Error<'a>> {
         let result = self
             .repository

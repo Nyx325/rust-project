@@ -13,7 +13,7 @@ pub struct ClientConsoleView {
 
 #[allow(unused)]
 impl ClientConsoleView {
-    pub fn new(page_size: u128) -> Self {
+    pub fn new(page_size: u64) -> Self {
         Self {
             manager: ClientManager::new(page_size),
         }
@@ -30,9 +30,9 @@ impl ClientConsoleView {
 
     fn search_with_err_map(
         &mut self,
-        page: u128,
+        page: u64,
         criteria: &SearchCriteria,
-    ) -> Result<Vec<Client>, ()> {
+    ) -> Result<(Vec<Client>, u64), ()> {
         let search = match self.manager.search_by(&SearchCriteria::default(), page) {
             Ok(search) => (search),
             Err(e) => {
@@ -49,25 +49,30 @@ impl ClientConsoleView {
             }
         };
 
-        Ok(result)
+        Ok((result, search.total_pages))
     }
 
     fn list_clients(&mut self) {
-        Self::clear_linux_console();
         let mut page = 1;
         loop {
-            let result = match self.search_with_err_map(page, &SearchCriteria::default()) {
-                Ok(result) => result,
-                Err(_) => return,
-            };
+            Self::clear_linux_console();
+            let (clients, total_pages) =
+                match self.search_with_err_map(page, &SearchCriteria::default()) {
+                    Ok(result) => result,
+                    Err(_) => return,
+                };
 
-            for client in result {
-                println!("{}", client)
+            let mut client_number = (page - 1) * self.manager.page_size() + 1;
+            for client in clients {
+                println!(
+                    "{}) Nombre: {}, Activo: {}",
+                    client_number, client.client_name, client.client_active
+                );
+                client_number += 1;
             }
-            println!("page {}", page);
+            println!("page {} of {}", page, total_pages);
             loop {
                 let opc: u8 = Self::capture_atributte("1) prev page\n2) next page\n3) exit", "u8");
-                Self::clear_linux_console();
                 match opc {
                     1 => {
                         if page > 1 {
@@ -76,7 +81,9 @@ impl ClientConsoleView {
                         break;
                     }
                     2 => {
-                        page += 1;
+                        if page < total_pages {
+                            page += 1;
+                        }
                         break;
                     }
                     3 => return,
