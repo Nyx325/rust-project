@@ -70,36 +70,6 @@ impl<'a> std::fmt::Display for Error<'a> {
 
 impl<'a> std::error::Error for Error<'a> {}
 
-impl<'a> From<ConnectorError<'a>> for Error<'a> {
-    fn from(source: ConnectorError<'a>) -> Self {
-        Self::ConnectorError {
-            source,
-            file: file!(),
-            line: line!(),
-        }
-    }
-}
-
-impl<'a> From<RusqliteError> for Error<'a> {
-    fn from(source: RusqliteError) -> Self {
-        Self::RusqliteError {
-            source,
-            file: file!(),
-            line: line!(),
-        }
-    }
-}
-
-impl<'a> From<SerdeJsonError> for Error<'a> {
-    fn from(source: SerdeJsonError) -> Self {
-        Self::SerdeError {
-            source,
-            file: file!(),
-            line: line!(),
-        }
-    }
-}
-
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClientRepo {
@@ -114,28 +84,75 @@ impl ClientRepo {
 
 impl<'a> Repository<Client, Error<'a>> for ClientRepo {
     fn add(&mut self, item: &Client) -> Result<(), Error<'a>> {
-        let conn = Connector::get_connection()?;
+        let conn = Connector::get_connection().map_err(|e| Error::ConnectorError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
+
         let sql = "INSERT INTO Client (client_active, client_name) VALUES (?,?)";
 
-        conn.prepare(sql)?
-            .execute(params![item.client_active, item.client_name])?;
+        conn.prepare(sql)
+            .map_err(|e| Error::RusqliteError {
+                source: e.into(),
+                file: file!(),
+                line: line!(),
+            })?
+            .execute(params![item.client_active, item.client_name])
+            .map_err(|e| Error::RusqliteError {
+                source: e,
+                file: file!(),
+                line: line!(),
+            })?;
 
         Ok(())
     }
 
     fn drop(&mut self, item: &mut Client) -> Result<(), Error<'a>> {
-        let conn = Connector::get_connection()?;
+        let conn = Connector::get_connection().map_err(|e| Error::ConnectorError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
+
         let query = "UPDATE Client SET client_active = 0 WHERE id_client = ?";
-        conn.prepare(query)?.execute(params![item.id_client])?;
+        conn.prepare(query)
+            .map_err(|e| Error::RusqliteError {
+                source: e,
+                file: file!(),
+                line: line!(),
+            })?
+            .execute(params![item.id_client])
+            .map_err(|e| Error::RusqliteError {
+                source: e,
+                file: file!(),
+                line: line!(),
+            })?;
 
         item.client_active = false;
         Ok(())
     }
 
     fn delete(&mut self, item: &Client) -> Result<(), Error<'a>> {
-        let conn = Connector::get_connection()?;
+        let conn = Connector::get_connection().map_err(|e| Error::ConnectorError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
+
         let query = "DELETE FROM Client WHERE id_client = ?";
-        conn.prepare(query)?.execute(params![item.id_client])?;
+        conn.prepare(query)
+            .map_err(|e| Error::RusqliteError {
+                source: e,
+                file: file!(),
+                line: line!(),
+            })?
+            .execute(params![item.id_client])
+            .map_err(|e| Error::RusqliteError {
+                source: e,
+                file: file!(),
+                line: line!(),
+            })?;
 
         Ok(())
     }
@@ -182,8 +199,17 @@ impl<'a> Repository<Client, Error<'a>> for ClientRepo {
         params.push(&id);
 
         // Ejecutar la consulta SQL
-        let conn = Connector::get_connection()?;
-        conn.execute(&query, params.as_slice())?;
+        let conn = Connector::get_connection().map_err(|e| Error::ConnectorError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
+        conn.execute(&query, params.as_slice())
+            .map_err(|e| Error::RusqliteError {
+                source: e,
+                file: file!(),
+                line: line!(),
+            })?;
 
         Ok(())
     }
@@ -224,14 +250,30 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientRepo {
     }
 
     fn search_by_id(&self, id: u32) -> Result<Option<Client>, Error<'a>> {
-        let conn = Connector::get_connection()?;
+        let conn = Connector::get_connection().map_err(|e| Error::ConnectorError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
 
         let sql = "SELECT id_client, client_active, client_name FROM Client WHERE id_client = ?";
 
-        let mut stmt = conn.prepare(sql)?;
-        let mut rows = stmt.query(params![id])?;
+        let mut stmt = conn.prepare(sql).map_err(|e| Error::RusqliteError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
+        let mut rows = stmt.query(params![id]).map_err(|e| Error::RusqliteError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
 
-        if let Some(row) = rows.next()? {
+        if let Some(row) = rows.next().map_err(|e| Error::RusqliteError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })? {
             Ok(Some(Self::from_row(row)?))
         } else {
             Ok(None)
@@ -243,20 +285,20 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientRepo {
         criteria: &SearchCriteria,
         page_number: u128,
     ) -> Result<LastSearch<SearchCriteria>, Error<'a>> {
-        let mut query = "SELECT id_client, client_active, client_name FROM Client".to_string();
+        let mut query = "SELECT id_client, client_active, client_name FROM Client ".to_string();
 
         if let Some(id_client) = criteria.id_client {
-            let str = format!("WHERE id_client LIKE %{}%", id_client);
+            let str = format!("WHERE id_client LIKE %{}% ", id_client);
             query.push_str(&str);
         }
 
         if let Some(client_active) = criteria.client_active {
-            let str = format!("WHERE client_active LIKE %{}%", client_active);
+            let str = format!("WHERE client_active LIKE %{}% ", client_active);
             query.push_str(&str);
         }
 
         if let Some(client_name) = &criteria.client_name {
-            let str = format!("WHERE client_active LIKE %{}%", client_name);
+            let str = format!("WHERE client_active LIKE %{}% ", client_name);
             query.push_str(&str);
         }
 
@@ -269,21 +311,40 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientRepo {
 
         query.push_str(&str);
 
-        let conn = Connector::get_connection()?;
-        let mut stmt = conn.prepare(&query)?;
-        let mut rows = stmt.query(params![])?;
+        let conn = Connector::get_connection().map_err(|e| Error::ConnectorError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
+        let mut stmt = conn.prepare(&query).map_err(|e| Error::RusqliteError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
+        let mut rows = stmt.query(params![]).map_err(|e| Error::RusqliteError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
 
         let mut result: LinkedList<Client> = LinkedList::new();
 
-        while let Some(row) = rows.next()? {
+        while let Some(row) = rows.next().map_err(|e| Error::RusqliteError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })? {
             result.push_back(Self::from_row(row)?);
         }
 
-        let search: LastSearch<SearchCriteria> = LastSearch::new(
-            page_number,
-            criteria.clone(),
-            serde_json::to_string(&result)?,
-        );
+        let result = serde_json::to_string(&result).map_err(|e| Error::SerdeError {
+            source: e,
+            file: file!(),
+            line: line!(),
+        })?;
+
+        let search: LastSearch<SearchCriteria> =
+            LastSearch::new(page_number, criteria.clone(), result);
 
         Ok(search)
     }

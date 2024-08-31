@@ -17,7 +17,10 @@ pub enum Error<'a> {
 impl<'a> std::fmt::Display for Error<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            _ => todo!(),
+            Self::RepoError(e) => write!(f, "{}", e),
+            Self::InvalidField { source, file, line } => {
+                write!(f, "InvalidField: {} (on {}: {})", source, file, line)
+            }
         }
     }
 }
@@ -36,9 +39,9 @@ pub struct ClientManager<SearchCriteria> {
 
 #[allow(unused)]
 impl<'a> ClientManager<SearchCriteria> {
-    pub fn new() -> Self {
+    pub fn new(page_size: u128) -> Self {
         Self {
-            repository: ClientRepo::new(25),
+            repository: ClientRepo::new(page_size),
             last_search: None,
             last_selected: None,
         }
