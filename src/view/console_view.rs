@@ -49,7 +49,7 @@ pub trait ConsoleView {
     {
         loop {
             println!("{title}");
-            match Self::capture_atributte::<u8>("1) Si\n2) No", "u8") {
+            match Self::capture_atributte::<u8>("1) Yes\n2) No", "u8") {
                 1 => {
                     return Some(Self::capture_atributte::<T>(
                         "Ingresa el dato:",
@@ -58,7 +58,7 @@ pub trait ConsoleView {
                 }
                 2 => return None,
                 _ => {
-                    println!("Opción no válida");
+                    println!("Invalid option");
                     continue;
                 }
             };
@@ -66,10 +66,8 @@ pub trait ConsoleView {
     }
 
     fn clear_linux_console() {
-        /*
         if let Err(e) = Command::new("clear").status() {
             println!("Error al limpiar consola: {}\n\n\n\n\n", e);
         }
-        */
     }
 }

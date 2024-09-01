@@ -62,8 +62,11 @@ impl ClientConsoleView {
         let mut client_number = (page - 1) * self.manager.page_size() + 1;
         for client in clients {
             println!(
-                "{}) Nombre: {}, Activo: {}",
-                client_number, client.client_name, client.client_active
+                "{}) ID: {}, Name: {}, Active: {}",
+                client_number,
+                client.id_client.unwrap(),
+                client.client_name,
+                client.client_active
             );
             client_number += 1;
         }
@@ -88,17 +91,25 @@ impl ClientConsoleView {
                     .map_or("None".to_string(), |value| value)
             );
 
-            let options = "
-                1) Set id criteria\n
-                2) Set active criteria\n
-                3) Set name criteria\n
-                4) Continue
-            ";
-            let opc = Self::capture_atributte::<u8>(options, "u8");
+            let mut options = String::new();
+            options.push_str("1) Set id criteria\n");
+            options.push_str("2) Set active criteria\n");
+            options.push_str("3) Set name criteria\n");
+            options.push_str("4) Continue");
+
+            let opc = Self::capture_atributte::<u8>(&options, "u8");
             match opc {
-                1 => curr_criteria.id_client = Self::capture_option_attribute("", "u32"),
-                2 => curr_criteria.client_active = Self::capture_option_attribute("", "bool"),
-                3 => curr_criteria.client_name = Self::capture_option_attribute("", "String"),
+                1 => {
+                    curr_criteria.id_client = Self::capture_option_attribute("Add criteria?", "u32")
+                }
+                2 => {
+                    curr_criteria.client_active =
+                        Self::capture_option_attribute("Add criteria?", "bool")
+                }
+                3 => {
+                    curr_criteria.client_name =
+                        Self::capture_option_attribute("Add criteria?", "String")
+                }
                 4 => return curr_criteria,
                 _ => println!("Invalid option"),
             }
@@ -116,13 +127,12 @@ impl ClientConsoleView {
             } else {
                 let total_pages = total_pages.unwrap();
 
-                let title = "
-                    1) prev page\n
-                    2) next page\n
-                    3) exit
-                ";
+                let mut title = String::new();
+                title.push_str("1) prev page\n");
+                title.push_str("2) next page\n");
+                title.push_str("3) exit");
 
-                let opc: u8 = Self::capture_atributte(title, "u8");
+                let opc: u8 = Self::capture_atributte(&title, "u8");
                 match opc {
                     1 => {
                         if page > 1 {
