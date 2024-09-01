@@ -33,7 +33,7 @@ impl ClientConsoleView {
         page: u64,
         criteria: &SearchCriteria,
     ) -> Result<(Vec<Client>, u64), ()> {
-        let search = match self.manager.search_by(&SearchCriteria::default(), page) {
+        let search = match self.manager.search_by(criteria, page) {
             Ok(search) => (search),
             Err(e) => {
                 println!("Error {}", e);
@@ -52,41 +52,118 @@ impl ClientConsoleView {
         Ok((result, search.total_pages))
     }
 
-    fn list_clients(&mut self) {
+    fn get_clients_from_criteria(&mut self, criteria: &SearchCriteria, page: u64) -> Option<u64> {
+        Self::clear_linux_console();
+        let (clients, total_pages) = match self.search_with_err_map(page, criteria) {
+            Ok(result) => result,
+            Err(_) => return None,
+        };
+
+        let mut client_number = (page - 1) * self.manager.page_size() + 1;
+        for client in clients {
+            println!(
+                "{}) Nombre: {}, Activo: {}",
+                client_number, client.client_name, client.client_active
+            );
+            client_number += 1;
+        }
+        println!("page {} of {}", page, total_pages);
+        return Some(total_pages);
+    }
+
+    fn get_criteria() -> SearchCriteria {
+        let mut curr_criteria = SearchCriteria::default();
+        loop {
+            println!(
+                "Current criteria:\nID: {}\nActive: {}\nName: {}",
+                curr_criteria
+                    .id_client
+                    .map_or("None".to_string(), |value| value.to_string()),
+                curr_criteria
+                    .client_active
+                    .map_or("None".to_string(), |value| value.to_string()),
+                curr_criteria
+                    .client_name
+                    .clone()
+                    .map_or("None".to_string(), |value| value)
+            );
+
+            let options = "
+                1) Set id criteria\n
+                2) Set active criteria\n
+                3) Set name criteria\n
+                4) Continue
+            ";
+            let opc = Self::capture_atributte::<u8>(options, "u8");
+            match opc {
+                1 => curr_criteria.id_client = Self::capture_option_attribute("", "u32"),
+                2 => curr_criteria.client_active = Self::capture_option_attribute("", "bool"),
+                3 => curr_criteria.client_name = Self::capture_option_attribute("", "String"),
+                4 => return curr_criteria,
+                _ => println!("Invalid option"),
+            }
+        }
+    }
+
+    fn search_client(&mut self) {
+        let criteria = Self::get_criteria();
         let mut page = 1;
         loop {
-            Self::clear_linux_console();
-            let (clients, total_pages) =
-                match self.search_with_err_map(page, &SearchCriteria::default()) {
-                    Ok(result) => result,
-                    Err(_) => return,
-                };
+            let total_pages = self.get_clients_from_criteria(&criteria, page);
 
-            let mut client_number = (page - 1) * self.manager.page_size() + 1;
-            for client in clients {
-                println!(
-                    "{}) Nombre: {}, Activo: {}",
-                    client_number, client.client_name, client.client_active
-                );
-                client_number += 1;
+            if total_pages.is_none() {
+                println!("No hay resultados");
+            } else {
+                let total_pages = total_pages.unwrap();
+
+                let title = "
+                    1) prev page\n
+                    2) next page\n
+                    3) exit
+                ";
+
+                let opc: u8 = Self::capture_atributte(title, "u8");
+                match opc {
+                    1 => {
+                        if page > 1 {
+                            page -= 1;
+                        }
+                    }
+                    2 => {
+                        if page < total_pages {
+                            page += 1;
+                        }
+                    }
+                    3 => break,
+                    _ => println!("Invalid option"),
+                }
             }
-            println!("page {} of {}", page, total_pages);
-            loop {
+        }
+    }
+
+    fn list_clients(&mut self) {
+        let criteria = SearchCriteria::default();
+        let mut page = 1;
+        loop {
+            let total_pages = self.get_clients_from_criteria(&criteria, page);
+
+            if total_pages.is_none() {
+                println!("No hay resultados");
+            } else {
+                let total_pages = total_pages.unwrap();
                 let opc: u8 = Self::capture_atributte("1) prev page\n2) next page\n3) exit", "u8");
                 match opc {
                     1 => {
                         if page > 1 {
                             page -= 1;
                         }
-                        break;
                     }
                     2 => {
                         if page < total_pages {
                             page += 1;
                         }
-                        break;
                     }
-                    3 => return,
+                    3 => break,
                     _ => println!("Invalid option"),
                 }
             }
@@ -104,11 +181,12 @@ impl ConsoleView for ClientConsoleView {
             println!("3) Modify client");
             println!("4) Logic client deletion");
             println!("5) Complete client deletion");
-            println!("6) Search client deletion");
+            println!("6) Search client");
             println!("7) Exit");
             match Self::capture_atributte::<u8>("Select an option: ", "u8") {
                 1 => self.list_clients(),
                 2 => self.add_client(),
+                6 => self.search_client(),
                 7 => return,
                 _ => println!("Invalid option"),
             }

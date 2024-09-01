@@ -316,23 +316,32 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientRepo {
         page_number: u64,
     ) -> Result<LastSearch<SearchCriteria>, Error<'a>> {
         let mut where_str = String::new();
+        let mut separator = ""; // Inicia como cadena vacía
 
         if let Some(id_client) = criteria.id_client {
-            let str = format!(" id_client LIKE %{}% ", id_client);
-            where_str.push_str(&str);
+            let str = format!(" id_client LIKE '%{}%' ", id_client);
+            where_str.push_str(&format!("{}{}", separator, str));
+            separator = " AND "; // Cambia el separador a "AND"
         }
 
         if let Some(client_active) = criteria.client_active {
-            let str = format!(" client_active LIKE %{}% ", client_active);
-            where_str.push_str(&str);
+            let client_active = match client_active {
+                true => 1,
+                false => 0,
+            };
+
+            let str = format!(" client_active LIKE '%{}%' ", client_active);
+            where_str.push_str(&format!("{}{}", separator, str));
+            separator = " AND "; // Cambia el separador a "AND"
         }
 
         if let Some(client_name) = &criteria.client_name {
-            let str = format!(" client_active LIKE %{}% ", client_name);
-            where_str.push_str(&str);
+            let str = format!(" client_name LIKE '%{}%' ", client_name);
+            where_str.push_str(&format!("{}{}", separator, str));
+            separator = " AND "; // Cambia el separador a "AND"
         }
 
-        if where_str.len() != 0 {
+        if !where_str.is_empty() {
             where_str = format!("WHERE {}", where_str);
         }
 
@@ -418,13 +427,6 @@ impl<'a> Finder<Client, SearchCriteria, Error<'a>> for ClientRepo {
             file: file!(),
             line: line!(),
         })?;
-
-        println!(
-            "{}/{} = {}",
-            total_registers,
-            self.page_size(),
-            Self::total_pages(total_registers, self.page_size())
-        );
 
         let search: LastSearch<SearchCriteria> = LastSearch::new(
             page_number,
