@@ -66,8 +66,10 @@ pub trait ConsoleView {
     }
 
     fn clear_linux_console() {
+        /*
         if let Err(e) = Command::new("clear").status() {
             println!("Error al limpiar consola: {}\n\n\n\n\n", e);
         }
+        */
     }
 }

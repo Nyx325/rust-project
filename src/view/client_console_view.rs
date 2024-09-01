@@ -28,38 +28,26 @@ impl ClientConsoleView {
         self.manager.add(&client).map_err(|e| println!("{}", e));
     }
 
-    fn search_with_err_map(
+    fn get_clients_from_criteria(
         &mut self,
-        page: u64,
         criteria: &SearchCriteria,
-    ) -> Result<(Vec<Client>, u64), ()> {
-        let search = match self.manager.search_by(criteria, page) {
-            Ok(search) => (search),
-            Err(e) => {
-                println!("Error {}", e);
-                return Err(());
-            }
-        };
-
-        let result: Vec<Client> = match serde_json::from_str(&search.result) {
-            Ok(result) => result,
-            Err(e) => {
-                println!("Error {}", e);
-                return Err(());
-            }
-        };
-
-        Ok((result, search.total_pages))
-    }
-
-    fn get_clients_from_criteria(&mut self, criteria: &SearchCriteria, page: u64) -> Option<u64> {
+        page_number: u64,
+    ) -> Option<u64> {
         Self::clear_linux_console();
-        let (clients, total_pages) = match self.search_with_err_map(page, criteria) {
+        let search = match self.manager.search_by(criteria, page_number) {
             Ok(result) => result,
             Err(_) => return None,
         };
 
-        let mut client_number = (page - 1) * self.manager.page_size() + 1;
+        let clients: Vec<Client> = match serde_json::from_str(&search.result) {
+            Ok(clients) => clients,
+            Err(e) => {
+                println!("{}", e);
+                return None;
+            }
+        };
+
+        let mut client_number = (page_number - 1) * self.manager.page_size() + 1;
         for client in clients {
             println!(
                 "{}) ID: {}, Name: {}, Active: {}",
@@ -70,8 +58,43 @@ impl ClientConsoleView {
             );
             client_number += 1;
         }
-        println!("page {} of {}", page, total_pages);
-        return Some(total_pages);
+        if search.total_pages > 0 {
+            println!("page {} of {}", page_number, search.total_pages);
+            return Some(search.total_pages);
+        } else {
+            println!("No hay resultados");
+        }
+
+        Some(0)
+    }
+
+    fn list_clients(&mut self) {
+        let criteria = SearchCriteria::default();
+        let mut page = 1;
+        loop {
+            let total_pages = self.get_clients_from_criteria(&criteria, page);
+
+            if total_pages.is_none() {
+                return;
+            }
+
+            let total_pages = total_pages.unwrap();
+            let opc: u8 = Self::capture_atributte("1) prev page\n2) next page\n3) exit", "u8");
+            match opc {
+                1 => {
+                    if page > 1 {
+                        page -= 1;
+                    }
+                }
+                2 => {
+                    if page < total_pages {
+                        page += 1;
+                    }
+                }
+                3 => break,
+                _ => println!("Invalid option"),
+            }
+        }
     }
 
     fn get_criteria() -> SearchCriteria {
@@ -133,35 +156,6 @@ impl ClientConsoleView {
                 title.push_str("3) exit");
 
                 let opc: u8 = Self::capture_atributte(&title, "u8");
-                match opc {
-                    1 => {
-                        if page > 1 {
-                            page -= 1;
-                        }
-                    }
-                    2 => {
-                        if page < total_pages {
-                            page += 1;
-                        }
-                    }
-                    3 => break,
-                    _ => println!("Invalid option"),
-                }
-            }
-        }
-    }
-
-    fn list_clients(&mut self) {
-        let criteria = SearchCriteria::default();
-        let mut page = 1;
-        loop {
-            let total_pages = self.get_clients_from_criteria(&criteria, page);
-
-            if total_pages.is_none() {
-                println!("No hay resultados");
-            } else {
-                let total_pages = total_pages.unwrap();
-                let opc: u8 = Self::capture_atributte("1) prev page\n2) next page\n3) exit", "u8");
                 match opc {
                     1 => {
                         if page > 1 {
